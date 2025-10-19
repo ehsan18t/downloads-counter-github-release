@@ -261,12 +261,13 @@ function renderBadge(options: { label: string; value: string; color: string }): 
 }
 
 function measureTextWidth(text: string, padding: number): number {
+	const spaceCount = (text.match(/ /g) || []).length;
 	// More accurate text width calculation for Lato bold at 12.5px
-	// Average character width for Lato bold is approximately 7.5px
-	const charWidth = 7.5;
+	// Average character width for Lato bold is approximately 8px
+	const charWidth = 8;
 	const textWidth = text.length * charWidth;
 	// Apply padding on both sides (left + right = padding * 2)
-	return textWidth + padding * 2;
+	return textWidth + padding * (spaceCount === 0 ? 4 : 2);
 }
 
 function adjustColor(hex: string, amount: number): string {
