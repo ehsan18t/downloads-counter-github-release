@@ -47,7 +47,7 @@ const BADGE_COLOR_MAP: Record<string, string> = {
 };
 
 const BADGE_DEFAULT_COLOR = '#0d9488';
-const BADGE_HEIGHT = 20;
+const BADGE_HEIGHT = 28;
 
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -232,36 +232,89 @@ function renderBadge(options: { label: string; value: string; color: string }): 
 	const label = escapeXml(options.label);
 	const value = escapeXml(options.value);
 	const color = options.color;
-	const labelWidth = measureTextWidth(label);
-	const valueWidth = measureTextWidth(value);
+	const padding = 9; // Equal padding on all sides
+	const labelWidth = measureTextWidth(label, padding);
+	const valueWidth = measureTextWidth(value, padding);
 	const width = labelWidth + valueWidth;
+	const height = BADGE_HEIGHT;
+	const labelTextY = height / 2 + 4.5; // Better vertical centering
+	const valueTextX = labelWidth + valueWidth / 2;
 	const labelX = labelWidth / 2;
-	const valueX = labelWidth + valueWidth / 2;
 
 	return (
 		`<?xml version="1.0" encoding="UTF-8"?>\n` +
-		`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${BADGE_HEIGHT}" role="img" aria-label="${label}: ${value}">` +
+		`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${label}: ${value}">` +
 		`<title>${label}: ${value}</title>` +
-		`<linearGradient id="smooth" x2="0" y2="100%"><stop offset="0" stop-color="#fff" stop-opacity="0.7"/><stop offset="0.1" stop-color="#fff" stop-opacity="0.1"/><stop offset="0.9" stop-color="#fff" stop-opacity="0.3"/><stop offset="1" stop-color="#fff" stop-opacity="0.5"/></linearGradient>` +
-		`<clipPath id="round"><rect width="${width}" height="${BADGE_HEIGHT}" rx="3" fill="#fff"/></clipPath>` +
-		`<g clip-path="url(#round)">` +
-		`<rect width="${labelWidth}" height="${BADGE_HEIGHT}" fill="#555"/>` +
-		`<rect x="${labelWidth}" width="${valueWidth}" height="${BADGE_HEIGHT}" fill="${color}"/>` +
-		`<rect width="${width}" height="${BADGE_HEIGHT}" fill="url(#smooth)"/>` +
-		`</g>` +
-		`<g fill="#fff" text-anchor="middle" font-family="Verdana,DejaVu Sans,sans-serif" font-size="11">` +
-		`<text x="${labelX}" y="15" fill="#010101" fill-opacity="0.3">${label}</text>` +
-		`<text x="${labelX}" y="14">${label}</text>` +
-		`<text x="${valueX}" y="15" fill="#010101" fill-opacity="0.3">${value}</text>` +
-		`<text x="${valueX}" y="14">${value}</text>` +
+		// Label background - flat dark gray
+		`<rect width="${labelWidth}" height="${height}" fill="#555"/>` +
+		// Value background - flat color
+		`<rect x="${labelWidth}" width="${valueWidth}" height="${height}" fill="${color}"/>` +
+		// Text layer with Lato bold font
+		`<g font-family="Lato,'DejaVu Sans',Verdana,Geneva,sans-serif" font-size="12.5" font-weight="700" text-rendering="geometricPrecision">` +
+		// Label text - bold white
+		`<text x="${labelX}" y="${labelTextY}" text-anchor="middle" fill="#ffffff">${label}</text>` +
+		// Value text - bold white
+		`<text x="${valueTextX}" y="${labelTextY}" text-anchor="middle" fill="#ffffff">${value}</text>` +
 		`</g>` +
 		`</svg>`
 	);
 }
 
-function measureTextWidth(text: string): number {
-	const base = text.length * 7 + 10;
-	return Math.max(40, base);
+function measureTextWidth(text: string, padding: number): number {
+	// More accurate text width calculation for Lato bold at 12.5px
+	// Average character width for Lato bold is approximately 7.5px
+	const charWidth = 7.5;
+	const textWidth = text.length * charWidth;
+	// Apply padding on both sides (left + right = padding * 2)
+	return textWidth + padding * 2;
+}
+
+function adjustColor(hex: string, amount: number): string {
+	const normalized = normalizeHex(hex);
+	if (!normalized) {
+		return hex;
+	}
+
+	const r = clamp(parseInt(normalized.slice(1, 3), 16) + amount, 0, 255);
+	const g = clamp(parseInt(normalized.slice(3, 5), 16) + amount, 0, 255);
+	const b = clamp(parseInt(normalized.slice(5, 7), 16) + amount, 0, 255);
+
+	return `#${componentToHex(r)}${componentToHex(g)}${componentToHex(b)}`;
+}
+
+function normalizeHex(hex: string): string | null {
+	const match = hex.match(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
+	if (!match) {
+		return null;
+	}
+
+	const value = match[1];
+	if (value.length === 3) {
+		return `#${value
+			.split('')
+			.map((char) => char + char)
+			.join('')
+			.toUpperCase()}`;
+	}
+
+	return `#${value.toUpperCase()}`;
+}
+
+function clamp(value: number, min: number, max: number): number {
+	return Math.min(max, Math.max(min, value));
+}
+
+function componentToHex(value: number): string {
+	return value.toString(16).padStart(2, '0');
+}
+
+function createSvgId(seed: string, prefix: string): string {
+	let hash = 0;
+	for (let i = 0; i < seed.length; i++) {
+		hash = (hash * 31 + seed.charCodeAt(i)) | 0;
+	}
+
+	return `${prefix}-${(hash >>> 0).toString(16)}`;
 }
 
 function sanitizeColor(input: string | null): string {
